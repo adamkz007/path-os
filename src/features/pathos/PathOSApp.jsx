@@ -12,7 +12,15 @@ import {
   STAFF,
   STATUS_COLOR,
 } from "./constants";
-import { ASSESS_SYS, PROFILE_SYS, SYS, buildProfileHTML, fileToBase64, parseJSON } from "./ai";
+import {
+  ASSESS_SYS,
+  DEEPSEEK_UNSUPPORTED_UPLOAD,
+  PROFILE_SYS,
+  SYS,
+  buildProfileHTML,
+  createDeepSeekMessage,
+  parseJSON,
+} from "./ai";
 import { Bars, Donut, St } from "./charts.jsx";
 import { LANDMARKS, Landmark, Tree, layoutNodes, mulberry, segPath, slug } from "./journey.jsx";
 import PostJobForm from "./components/PostJobForm.jsx";
@@ -79,11 +87,11 @@ export default function PathOSApp() {
     try {
       let content;
       if (file) {
-        if (file.type === "application/pdf") { const b64 = await fileToBase64(file); content = [{ type:"document", source:{ type:"base64", media_type:"application/pdf", data:b64 } }, { type:"text", text:"Extract my professional profile from this resume." }]; }
-        else if (file.type.startsWith("image/")) { const b64 = await fileToBase64(file); content = [{ type:"image", source:{ type:"base64", media_type:file.type, data:b64 } }, { type:"text", text:"Extract my professional profile from this resume image." }]; }
-        else { const t = await file.text(); content = [{ type:"text", text:"Extract my professional profile from this resume:\n\n" + t }]; }
-      } else { content = [{ type:"text", text:"Extract my professional profile from this resume:\n\n" + pasteText }]; }
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:3000, system:PROFILE_SYS, messages:[{ role:"user", content }] }) });
+        if (file.type === "application/pdf" || file.type.startsWith("image/")) throw new Error(DEEPSEEK_UNSUPPORTED_UPLOAD);
+        const t = await file.text();
+        content = `Extract my professional profile from this resume:\n\n${t}`;
+      } else { content = `Extract my professional profile from this resume:\n\n${pasteText}`; }
+      const res = await createDeepSeekMessage({ max_tokens:3000, system:PROFILE_SYS, messages:[{ role:"user", content }] });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error?.message || "Parse error");
       const txt = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
@@ -105,7 +113,7 @@ export default function PathOSApp() {
     setStatus("loading"); setStream(""); setData(null); setError(""); setSelected(null); setDone(new Set()); setView("analysis");
     const msg = `Current role: ${currentRole}\nExperience: ${experience || "not specified"}\nEducation: ${education || "not specified"}\nSkills: ${skills.length ? skills.join(", ") : "not specified"}\nTarget role: ${targetRole}\nTarget industry: ${targetIndustry || "not specified"}\n\nProduce the full analysis and illustrated journey.`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:5000, stream:true, system:SYS, messages:[{ role:"user", content:msg }] }) });
+      const res = await createDeepSeekMessage({ max_tokens:5000, stream:true, system:SYS, messages:[{ role:"user", content:msg }] });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || "API error"); }
       const reader = res.body.getReader(), dec = new TextDecoder(); let acc = "";
       while (true) { const { done:d, value } = await reader.read(); if (d) break;
@@ -154,7 +162,7 @@ export default function PathOSApp() {
     setAssessLoading(true); setAssessOut(null);
     const summary = ASSESS_DEFS.map(d => { const v = assess[d.key]; if (!v || (Array.isArray(v) && !v.length)) return null; return `${d.name}: ${Array.isArray(v) ? v.join(", ") : v}`; }).filter(Boolean).join("\n");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1200, system:ASSESS_SYS, messages:[{ role:"user", content:`My assessment results:\n${summary}\n\nMy target role: ${targetRole}. Synthesize my holistic profile.` }] }) });
+      const res = await createDeepSeekMessage({ max_tokens:1200, system:ASSESS_SYS, messages:[{ role:"user", content:`My assessment results:\n${summary}\n\nMy target role: ${targetRole}. Synthesize my holistic profile.` }] });
       const j = await res.json(); const txt = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
       setAssessOut(parseJSON(txt) || { summary: txt });
     } catch (e) { setAssessOut({ summary:"Couldn't synthesize: " + e.message }); }
@@ -221,9 +229,9 @@ export default function PathOSApp() {
       {view === "profile" && (
         <div className="px-wrap">
           {!profile && parseStatus !== "parsing" && (<>
-            <div className="px-intro"><h1>Your profile is your CV</h1><p className="sub">Upload your resume and PathOS builds a living profile automatically — certificates become skill badges, achievements become success-story badges. Share it as a link for any job application.</p></div>
-            <div className="px-up"><div className="ic">📄</div><h3>Upload your resume / CV</h3><p>PDF, image, or text file. PathOS reads it and captures everything into your profile.</p>
-              <input ref={fileRef} type="file" accept=".pdf,image/*,.txt,.md" style={{display:"none"}} onChange={onFile} />
+            <div className="px-intro"><h1>Your profile is your CV</h1><p className="sub">Upload a text resume or paste your resume text and PathOS builds a living profile automatically — certificates become skill badges, achievements become success-story badges. Share it as a link for any job application.</p></div>
+            <div className="px-up"><div className="ic">📄</div><h3>Upload your resume / CV</h3><p>Text file or pasted text. PathOS reads it and captures everything into your profile.</p>
+              <input ref={fileRef} type="file" accept=".txt,.md" style={{display:"none"}} onChange={onFile} />
               <button className="px-up-btn" onClick={() => fileRef.current?.click()}>Choose file to upload</button>
               {parseStatus === "error" && <p style={{color:PAL.terra,marginTop:12}}>{parseError}</p>}
               <div className="px-or">— or paste your resume text —</div>
@@ -231,7 +239,7 @@ export default function PathOSApp() {
               <button className="px-go" style={{maxWidth:240,margin:"10px auto 0"}} disabled={!pasteText.trim()} onClick={() => parseResume(null)}>Build my profile ✦</button>
             </div>
           </>)}
-          {parseStatus === "parsing" && <div className="px-state"><div className="px-spin"/><h3>Reading your resume…</h3><p>Claude is extracting your experience, skills, certificates, and achievements.</p></div>}
+          {parseStatus === "parsing" && <div className="px-state"><div className="px-spin"/><h3>Reading your resume…</h3><p>Extracting your experience, skills, certificates, and achievements.</p></div>}
           {profile && parseStatus !== "parsing" && (<>
             <div className="px-prof-head">
               <div className="px-prof-name">{profile.name || "Your name"}</div>
@@ -306,7 +314,7 @@ export default function PathOSApp() {
             </div>
           </div>
         )}
-        {status === "loading" && <div className="px-state"><div className="px-spin"/><h3>Charting your path…</h3><p>Claude is scoring your readiness, finding gaps, and plotting milestones.</p>{stream && <div className="px-stream" ref={streamEnd}>{stream}</div>}</div>}
+        {status === "loading" && <div className="px-state"><div className="px-spin"/><h3>Charting your path…</h3><p>Scoring your readiness, finding gaps, and plotting milestones.</p>{stream && <div className="px-stream" ref={streamEnd}>{stream}</div>}</div>}
         {status === "error" && <div className="px-state"><h3 style={{color:PAL.terra}}>Something went wrong</h3><p>{error}</p><button className="px-go" style={{maxWidth:220}} onClick={generate}>Try again</button></div>}
         {status === "done" && data && (
           <div className="px-wrap">

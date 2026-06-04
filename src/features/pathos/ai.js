@@ -21,6 +21,17 @@ export const ASSESS_SYS = `You synthesize a person's holistic assessment results
 
 export function parseJSON(text){const m=text.match(/```json\s*([\s\S]*?)```/)||text.match(/\{[\s\S]*\}/);if(m){try{return JSON.parse(m[1]||m[0]);}catch{}}try{return JSON.parse(text);}catch{}return null;}
 export function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});}
+export const DEEPSEEK_MODEL = "deepseek-v4-flash";
+export const DEEPSEEK_MESSAGES_ENDPOINT = "/api/deepseek/v1/messages";
+export const DEEPSEEK_UNSUPPORTED_UPLOAD = "DeepSeek is now the active AI provider here, and this integration only accepts pasted or text-based resumes. For PDF or image uploads, please paste the resume text instead.";
+
+export function createDeepSeekMessage(body){
+  return fetch(DEEPSEEK_MESSAGES_ENDPOINT,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ model:DEEPSEEK_MODEL, ...body }),
+  });
+}
 
 export function buildProfileHTML(p,certs,achievements,skills,exp,edu){
   const esc=(s)=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
