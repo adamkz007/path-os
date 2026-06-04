@@ -39,6 +39,31 @@ import {
 const DEFAULT_CURRENT_ROLE = "Commercial Manager";
 const DEFAULT_TARGET_ROLE = "CEO of a Creative Agency";
 const OAUTH_CONTEXT_KEY = "pathos-google-oauth-context";
+const DEMO_SESSION_KEY = "pathos-demo-session";
+const DEMO_PASSWORD = "demo12345";
+const DEMO_ACCOUNTS = {
+  seeker: {
+    role: "seeker",
+    name: "Demo Job Seeker",
+    email: "jobseeker.demo@pathos.app",
+    password: DEMO_PASSWORD,
+    organization: "PathOS Demo",
+  },
+  company: {
+    role: "company",
+    name: "Demo Hiring Manager",
+    email: "company.demo@pathos.app",
+    password: DEMO_PASSWORD,
+    organization: "Hatch & Co",
+  },
+  university: {
+    role: "university",
+    name: "Demo Programme Lead",
+    email: "university.demo@pathos.app",
+    password: DEMO_PASSWORD,
+    organization: "Universiti Malaya",
+  },
+};
 
 const createAuthForm = () => ({
   name: "",
@@ -76,6 +101,35 @@ const clearOAuthContext = () => {
   window.sessionStorage.removeItem(OAUTH_CONTEXT_KEY);
 };
 
+const readDemoSession = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(DEMO_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeDemoSession = (session) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(session));
+};
+
+const clearDemoSession = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+};
+
 const normalizeWorkspace = (workspace = {}) => ({
   currentRole: typeof workspace.currentRole === "string" && workspace.currentRole.trim() ? workspace.currentRole : DEFAULT_CURRENT_ROLE,
   experience: typeof workspace.experience === "string" ? workspace.experience : "",
@@ -98,6 +152,71 @@ const normalizeWorkspace = (workspace = {}) => ({
   postedJobs: Array.isArray(workspace.postedJobs) ? workspace.postedJobs : JOBS_SEED,
   hhFilter: typeof workspace.hhFilter === "string" ? workspace.hhFilter : "",
   applicants: Array.isArray(workspace.applicants) ? workspace.applicants : APPLICANTS_SEED,
+});
+
+const getDemoAccount = (role) => (role ? DEMO_ACCOUNTS[role] || null : null);
+
+const resolveDemoAccount = ({ role, email, password }) => {
+  const demoAccount = getDemoAccount(role);
+  if (!demoAccount) {
+    return null;
+  }
+
+  return email.trim().toLowerCase() === demoAccount.email && password === demoAccount.password
+    ? demoAccount
+    : null;
+};
+
+const createDemoWorkspace = (role) => {
+  if (role === "company") {
+    return normalizeWorkspace({
+      cView: "dashboard",
+      postedJobs: JOBS_SEED,
+      applicants: APPLICANTS_SEED,
+      hhFilter: "",
+    });
+  }
+
+  if (role === "university") {
+    return normalizeWorkspace({
+      uView: "graduates",
+    });
+  }
+
+  return normalizeWorkspace({
+    currentRole: DEFAULT_CURRENT_ROLE,
+    experience: "8 years across agency accounts, brand strategy, and client leadership.",
+    education: "BA (Hons) Mass Communication, Universiti Malaya",
+    skills: ["Brand strategy", "Client management", "Campaign planning", "Pitching"],
+    targetRole: "Creative Strategy Lead",
+    targetIndustry: "Creative agency",
+    view: "applications",
+    apps: APPS_SEED,
+    postedJobs: JOBS_SEED,
+    applicants: APPLICANTS_SEED,
+    openToWork: true,
+  });
+};
+
+const createDemoSessionBundle = (demoAccount) => ({
+  session: {
+    id: `demo-session-${demoAccount.role}`,
+    isDemo: true,
+  },
+  user: {
+    id: `demo-${demoAccount.role}`,
+    email: demoAccount.email,
+    name: demoAccount.name,
+  },
+});
+
+const createDemoProfile = (demoAccount) => ({
+  user_id: `demo-${demoAccount.role}`,
+  email: demoAccount.email,
+  full_name: demoAccount.name,
+  app_role: demoAccount.role,
+  organization: demoAccount.organization,
+  workspace: createDemoWorkspace(demoAccount.role),
 });
 
 export default function PathOSApp() {
@@ -208,7 +327,7 @@ export default function PathOSApp() {
   );
 
   const persistableAccount = useMemo(() => {
-    if (!sessionBundle?.user?.id || !role) {
+    if (!sessionBundle?.user?.id || !role || sessionBundle?.session?.isDemo) {
       return null;
     }
 
@@ -347,10 +466,34 @@ export default function PathOSApp() {
     applyAccountProfile(account, nextSessionBundle);
   };
 
+  const loadDemoAccount = (demoAccount) => {
+    if (!demoAccount) {
+      return;
+    }
+
+    writeDemoSession({ role: demoAccount.role });
+    clearOAuthContext();
+    setAuthError("");
+    setSaveState("idle");
+    applyAccountProfile(createDemoProfile(demoAccount), createDemoSessionBundle(demoAccount));
+    setAuthForm(createAuthForm());
+    setAuthMode("signin");
+    setAuthReady(true);
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     const loadSession = async () => {
+      const demoSession = readDemoSession();
+      const demoAccount = getDemoAccount(demoSession?.role);
+      if (demoAccount) {
+        loadDemoAccount(demoAccount);
+        return;
+      }
+
+      clearDemoSession();
+
       if (!neonEnabled) {
         setAuthReady(true);
         return;
@@ -364,6 +507,7 @@ export default function PathOSApp() {
         }
 
         if (!nextSessionBundle) {
+          clearDemoSession();
           resetWorkspace();
           setSessionBundle(null);
           setAuthReady(true);
@@ -372,6 +516,7 @@ export default function PathOSApp() {
 
         await hydrateAccount(nextSessionBundle, oauthContext || {});
         if (!cancelled) {
+          clearDemoSession();
           clearOAuthContext();
           setAuthReady(true);
         }
@@ -439,6 +584,19 @@ export default function PathOSApp() {
 
     if (!authForm.email.trim() || !authForm.password.trim()) {
       setAuthError("Email and password are required.");
+      return;
+    }
+
+    const demoAccount = authMode === "signin"
+      ? resolveDemoAccount({
+          role: loginRole,
+          email: authForm.email,
+          password: authForm.password,
+        })
+      : null;
+
+    if (demoAccount) {
+      loadDemoAccount(demoAccount);
       return;
     }
 
@@ -544,6 +702,7 @@ export default function PathOSApp() {
 
     lastPersistedRef.current = "";
     clearOAuthContext();
+    clearDemoSession();
     setSaveState("idle");
     setSessionBundle(null);
     setAccountName("");
@@ -657,6 +816,8 @@ export default function PathOSApp() {
   const setAppStatus = (id, st) => setApps(p => p.map(a => a.id === id ? { ...a, status: st } : a));
 
   /* ── role landing / login ── */
+  const activeDemoAccount = getDemoAccount(loginRole);
+
   if (!authReady) {
     return (<><style>{PATHOS_CSS}</style><div className="px"><div className="px-state"><div className="px-spin"/><h3>Connecting your account…</h3><p>Checking Neon authentication and loading your saved PathOS workspace.</p></div></div></>);
   }
@@ -669,9 +830,9 @@ export default function PathOSApp() {
           <h1>Welcome to PathOS</h1>
           <p className="sub">Choose the workspace you want to connect to Neon. Each account keeps its own saved data and authentication session.</p>
           <div className="px-roles">
-            <div className="px-role" onClick={() => { setLoginRole("seeker"); setAuthMode("signup"); setAuthError(""); }}><div className="ic">🧭</div><h3>Job Seeker</h3><p>Build a living profile, map your path to any role, track applications, and find aligned jobs.</p><div className="go">Use seeker account →</div></div>
-            <div className="px-role" onClick={() => { setLoginRole("company"); setAuthMode("signup"); setAuthError(""); }}><div className="ic">🏢</div><h3>Company</h3><p>Post jobs, headhunt candidates before they apply, run team assessments, and manage your hiring pipeline.</p><div className="go">Use company account →</div></div>
-            <div className="px-role" onClick={() => { setLoginRole("university"); setAuthMode("signup"); setAuthError(""); }}><div className="ic">🎓</div><h3>University</h3><p>Track graduate outcomes, map syllabus skills, and see employment analytics across batches.</p><div className="go">Use university account →</div></div>
+            <div className="px-role" onClick={() => { setLoginRole("seeker"); setAuthMode("signin"); setAuthError(""); setAuthForm(createAuthForm()); }}><div className="ic">🧭</div><h3>Job Seeker</h3><p>Build a living profile, map your path to any role, track applications, and find aligned jobs.</p><div className="go">Use seeker account →</div></div>
+            <div className="px-role" onClick={() => { setLoginRole("company"); setAuthMode("signin"); setAuthError(""); setAuthForm(createAuthForm()); }}><div className="ic">🏢</div><h3>Company</h3><p>Post jobs, headhunt candidates before they apply, run team assessments, and manage your hiring pipeline.</p><div className="go">Use company account →</div></div>
+            <div className="px-role" onClick={() => { setLoginRole("university"); setAuthMode("signin"); setAuthError(""); setAuthForm(createAuthForm()); }}><div className="ic">🎓</div><h3>University</h3><p>Track graduate outcomes, map syllabus skills, and see employment analytics across batches.</p><div className="go">Use university account →</div></div>
           </div>
         </div>
       ) : (
@@ -681,6 +842,23 @@ export default function PathOSApp() {
           <p className="px-role-note">Workspace: {loginRole === "seeker" ? "Job Seeker" : loginRole === "company" ? "Company" : "University"}</p>
           {!neonEnabled && <div className="px-alert warn">{neonConfigError}</div>}
           {authError && <div className="px-alert">{authError}</div>}
+          {authMode === "signin" && activeDemoAccount && (
+            <div className="px-demo-box">
+              <div className="px-demo-head">
+                <span>Demo account</span>
+                <button
+                  type="button"
+                  className="px-linkbtn"
+                  onClick={() => loadDemoAccount(activeDemoAccount)}
+                >
+                  Load demo workspace
+                </button>
+              </div>
+              <p>Use these credentials to open the seeded {loginRole === "seeker" ? "job seeker" : loginRole} mock workspace.</p>
+              <div className="px-demo-cred"><span>Email</span><code>{activeDemoAccount.email}</code></div>
+              <div className="px-demo-cred"><span>Password</span><code>{activeDemoAccount.password}</code></div>
+            </div>
+          )}
           {authMode === "signup" && (
             <>
               <div className="px-field"><label>Full name</label><input value={authForm.name} onChange={(e) => updateAuthForm("name", e.target.value)} placeholder={loginRole === "company" ? "Hiring manager name" : loginRole === "university" ? "Programme lead name" : "Your full name"} /></div>
@@ -689,7 +867,7 @@ export default function PathOSApp() {
           )}
           <div className="px-field"><label>{loginRole === "company" ? "Work email" : loginRole === "university" ? "Institution email" : "Email"}</label><input type="email" value={authForm.email} onChange={(e) => updateAuthForm("email", e.target.value)} placeholder={loginRole === "company" ? "you@company.com" : loginRole === "university" ? "you@university.edu" : "you@email.com"} autoComplete="email" /></div>
           <div className="px-field"><label>Password</label><input type="password" value={authForm.password} onChange={(e) => updateAuthForm("password", e.target.value)} placeholder="Use at least 8 characters" autoComplete={authMode === "signup" ? "new-password" : "current-password"} /></div>
-          <button className="px-go" type="submit" disabled={authLoading || !neonEnabled}>{authLoading ? "Connecting…" : authMode === "signup" ? "Create account & continue →" : "Sign in & load workspace →"}</button>
+          <button className="px-go" type="submit" disabled={authLoading || (authMode === "signup" && !neonEnabled)}>{authLoading ? "Connecting…" : authMode === "signup" ? "Create account & continue →" : "Sign in & load workspace →"}</button>
           <button className="px-google-btn" type="button" onClick={handleGoogleAuth} disabled={authLoading || !neonEnabled}>
             <span className="px-google-mark" aria-hidden="true">
               <svg viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">

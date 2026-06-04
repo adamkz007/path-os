@@ -32,6 +32,14 @@ export const PATHOS_CSS = `
 .px-role-note{text-align:center;font-size:12px;color:${PAL.tealDark};font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:-.55rem 0 1rem;}
 .px-alert{margin-bottom:1rem;padding:10px 12px;border:1.5px solid #dfb6ac;border-radius:10px;background:${PAL.gapBg};color:${PAL.gap};font-size:12.5px;line-height:1.55;}
 .px-alert.warn{background:${PAL.warnBg};border-color:#e5d39d;color:${PAL.goldDeep};}
+.px-demo-box{margin-bottom:1rem;padding:12px;border:1.5px solid ${PAL.creamLow};border-radius:12px;background:#fff;}
+.px-demo-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.px-demo-head span{font-family:'Fredoka';font-size:13px;font-weight:600;color:${PAL.terra};}
+.px-demo-box p{font-size:12px;color:${PAL.inkSoft};line-height:1.55;margin-bottom:10px;}
+.px-demo-cred{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;background:${PAL.paperDark};font-size:11.5px;}
+.px-demo-cred + .px-demo-cred{margin-top:8px;}
+.px-demo-cred span{font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:${PAL.tealDark};}
+.px-demo-cred code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:${PAL.ink};}
 .px-auth-switch{text-align:center;font-size:12px;color:${PAL.inkSoft};margin-top:12px;line-height:1.5;}
 .px-linkbtn{border:none;background:none;color:${PAL.terra};font:inherit;font-weight:600;cursor:pointer;padding:0;}
 .px-linkbtn:hover{text-decoration:underline;}
