@@ -64,6 +64,52 @@ const normalizeWorkspace = (workspace = {}) => ({
   applicants: Array.isArray(workspace.applicants) ? workspace.applicants : APPLICANTS_SEED,
 });
 
+function NavTabs({ tabs, active, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [open]);
+
+  useEffect(() => { setOpen(false); }, [active]);
+
+  const activeLabel = tabs.find(([k]) => k === active)?.[1] ?? "Menu";
+
+  return (
+    <div className="px-nav-tabs" ref={wrapRef}>
+      <div className="px-tabs px-tabs-desk">
+        {tabs.map(([k, l]) => (
+          <button key={k} type="button" className={`px-tab ${active === k ? "on" : ""}`} onClick={() => onChange(k)}>{l}</button>
+        ))}
+      </div>
+      <div className="px-nav-mob">
+        <button type="button" className="px-nav-burger" aria-expanded={open} aria-haspopup="true" aria-label={`Navigation menu, current: ${activeLabel}`} onClick={() => setOpen(o => !o)}>
+          <span className="px-nav-burger-ic" aria-hidden="true">{open ? "✕" : "☰"}</span>
+        </button>
+        {open && (
+          <div className="px-nav-drop">
+            <div className="px-tabs px-tabs-mob">
+              {tabs.map(([k, l]) => (
+                <button key={k} type="button" className={`px-tab ${active === k ? "on" : ""}`} onClick={() => { onChange(k); setOpen(false); }}>{l}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const createDemoWorkspace = (demoRole) => {
   if (demoRole === "company") {
     return normalizeWorkspace({
@@ -624,11 +670,11 @@ export default function PathOSApp() {
       {Header}
       <div className="px-nav">
         <div className="px-nav-title">{data?.journey_title || (profile ? profile.name : "Workspace")}</div>
-        <div className="px-tabs">
-          {[["profile","📇 Profile"],["assessments","🧠 Assessments"],["analysis","📋 Analysis"],["journey","🗺️ Journey"],["jobs","💼 Jobs"],["applications","📨 Applications"]].map(([k,l]) => (
-            <button key={k} className={`px-tab ${view===k?"on":""}`} onClick={() => setView(k)}>{l}</button>
-          ))}
-        </div>
+        <NavTabs
+          tabs={[["profile","📇 Profile"],["assessments","🧠 Assessments"],["analysis","📋 Analysis"],["journey","🗺️ Journey"],["jobs","💼 Jobs"],["applications","📨 Applications"]]}
+          active={view}
+          onChange={setView}
+        />
         {data && <div className="px-readpill" title="Rises as you complete milestones">Ready <b style={{color:readColor(liveReadiness)}}>{liveReadiness}%</b><span className="dotbar"><i style={{width:liveReadiness+"%",background:readColor(liveReadiness)}}/></span></div>}
       </div>
 
@@ -800,7 +846,7 @@ export default function PathOSApp() {
               })}
             </svg>
             </div>
-            {sel && (<div className="px-sheet"><button className="px-sheet-x" onClick={() => setSelected(null)}>×</button><span className="px-sheet-tag">Stop {selected+1} · {sel.timeline}</span><div className="px-sheet-nm">{sel.name}</div><div className="px-sheet-ac">{sel.action}</div><p className="px-sheet-dt">{sel.detail}</p><div className="px-chips">{sel.skill_unlocked && <div className="px-chip"><b>Skill unlocked</b>{sel.skill_unlocked}</div>}{sel.gap_closed && <div className="px-chip"><b>Closes gap</b>{sel.gap_closed}</div>}{sel.cert && <div className="px-chip"><b>Certification</b>{sel.cert}</div>}</div><button className={`px-reach ${done.has(selected)?"done":"todo"}`} onClick={() => toggleDone(selected)}>{done.has(selected)?"✓ Reached · +150 XP · badge earned":"Mark this milestone reached"}</button></div>)}
+            {sel && (<div className="px-sheet"><button className="px-sheet-x" onClick={() => setSelected(null)}>×</button>{milestones.length > 1 && (<div className="px-sheet-nav"><button type="button" className="px-sheet-chev" disabled={selected === 0} onClick={() => selectMilestone(selected - 1)} aria-label="Previous milestone">‹</button><span className="px-sheet-nav-count">{selected + 1} / {milestones.length}</span><button type="button" className="px-sheet-chev" disabled={selected >= milestones.length - 1} onClick={() => selectMilestone(selected + 1)} aria-label="Next milestone">›</button></div>)}<span className="px-sheet-tag">Stop {selected+1} · {sel.timeline}</span><div className="px-sheet-nm">{sel.name}</div><div className="px-sheet-ac">{sel.action}</div><p className="px-sheet-dt">{sel.detail}</p><div className="px-chips">{sel.skill_unlocked && <div className="px-chip"><b>Skill unlocked</b>{sel.skill_unlocked}</div>}{sel.gap_closed && <div className="px-chip"><b>Closes gap</b>{sel.gap_closed}</div>}{sel.cert && <div className="px-chip"><b>Certification</b>{sel.cert}</div>}</div><button className={`px-reach ${done.has(selected)?"done":"todo"}`} onClick={() => toggleDone(selected)}>{done.has(selected)?"✓ Reached · +150 XP · badge earned":"Mark this milestone reached"}</button></div>)}
             {selB && (<div className="px-sheet"><button className="px-sheet-x" onClick={() => setSelBranch(null)}>×</button><span className="px-sheet-tag" style={{background:PAL.blue}}>Alternative path · transferable</span><div className="px-sheet-nm">{selB.label}</div><div className="px-sheet-ac" style={{color:PAL.blue}}>→ {selB.alt_role}</div><p className="px-sheet-dt">{selB.rationale}</p><div className="px-chips">{(selB.transferable_skills||[]).length>0 && <div className="px-chip"><b>Transfers from your path</b>{(selB.transferable_skills||[]).join(", ")}</div>}{(selB.extra_steps||[]).length>0 && <div className="px-chip"><b>Extra step to pivot</b>{(selB.extra_steps||[]).join("; ")}</div>}</div><button className="px-reach todo" style={{background:PAL.blue}} onClick={() => { setTargetRole(selB.alt_role); setSelBranch(null); generate(); }}>Pursue this path → re-map journey</button></div>)}
             <div className={`px-joy${sel || selB ? " lifted" : ""}`} aria-label="Pathway navigation">
               <span className="px-joy-label">Explore</span>
@@ -809,7 +855,7 @@ export default function PathOSApp() {
             </div>
           </div>
           <div className="px-rail">
-            <span className="px-rail-link" onClick={() => setView("analysis")}>← Back to analysis</span>
+            <span className="px-rail-link px-rail-back" onClick={() => setView("analysis")}>← Back to analysis</span>
             {allDone && <div className="px-banner">🎉 Journey complete — {liveReadiness}% ready for {data.destination_label || targetRole}!</div>}
             {done.size > 0 && <div className="px-rail-link" style={{color:PAL.gold}} onClick={() => setView("profile")}>✦ {done.size} badge{done.size>1?"s":""} earned — view on profile →</div>}
             <div><div className="px-prog-l"><span>Journey progress</span><span>{done.size}/{milestones.length}</span></div><div className="px-track"><div className="px-fill" style={{width:pct+"%"}}/></div><div className="px-xp">✦ {xp} XP earned</div></div>
@@ -868,7 +914,7 @@ export default function PathOSApp() {
     const filtered = pool.filter(c => !hhFilter || (c.skills.join(" ") + c.headline + c.target).toLowerCase().includes(hhFilter.toLowerCase()));
     return (<><style>{PATHOS_CSS}</style><div className="px">
       {Header}
-      <div className="px-nav"><div className="px-nav-title">Hatch & Co · Creative Agency</div><div className="px-tabs">{[["dashboard","📊 Dashboard"],["post","➕ Post Jobs"],["headhunt","🎯 Headhunt"],["team","👥 Team"],["staff","🪪 Staff"],["applicants","📨 Applicants"],["hr","🧾 HR"]].map(([k,l]) => <button key={k} className={`px-tab ${cView===k?"on":""}`} onClick={() => setCView(k)}>{l}</button>)}</div></div>
+      <div className="px-nav"><div className="px-nav-title">Hatch & Co · Creative Agency</div><NavTabs tabs={[["dashboard","📊 Dashboard"],["post","➕ Post Jobs"],["headhunt","🎯 Headhunt"],["team","👥 Team"],["staff","🪪 Staff"],["applicants","📨 Applicants"],["hr","🧾 HR"]]} active={cView} onChange={setCView} /></div>
       <div className="px-wrap">
         {cView === "dashboard" && (<>
           <div className="px-intro"><h1>Company dashboard</h1><p className="sub">Hiring, talent pipeline, and team health at a glance.</p></div>
@@ -922,7 +968,7 @@ export default function PathOSApp() {
     const statusMix = ["Employed","Seeking","Further study"].map(s => ({ k:s, v: GRADUATES.filter(g => g.status===s).length }));
     return (<><style>{PATHOS_CSS}</style><div className="px">
       {Header}
-      <div className="px-nav"><div className="px-nav-title">Universiti Malaya</div><div className="px-tabs">{[["graduates","🎓 Graduates"],["syllabus","📚 Syllabus Skills"],["batches","📈 Batch Performance"],["analytics","📊 Analytics"]].map(([k,l]) => <button key={k} className={`px-tab ${uView===k?"on":""}`} onClick={() => setUView(k)}>{l}</button>)}</div></div>
+      <div className="px-nav"><div className="px-nav-title">Universiti Malaya</div><NavTabs tabs={[["graduates","🎓 Graduates"],["syllabus","📚 Syllabus Skills"],["batches","📈 Batch Performance"],["analytics","📊 Analytics"]]} active={uView} onChange={setUView} /></div>
       <div className="px-wrap">
         {uView === "graduates" && (<>
           <div className="px-intro"><h1>Graduate tracker</h1><p className="sub">Where your graduates are now. Profiles are visible to you because they're affiliated with your institution.</p></div>
