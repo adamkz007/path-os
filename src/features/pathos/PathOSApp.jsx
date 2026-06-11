@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   APPLICANTS_SEED,
   APP_STATUSES,
@@ -38,6 +38,7 @@ import {
 
 const DEFAULT_CURRENT_ROLE = "Commercial Manager";
 const DEFAULT_TARGET_ROLE = "CEO of a Creative Agency";
+const EMPTY_BRANCHES = [];
 
 const normalizeWorkspace = (workspace = {}) => ({
   currentRole: typeof workspace.currentRole === "string" && workspace.currentRole.trim() ? workspace.currentRole : DEFAULT_CURRENT_ROLE,
@@ -372,7 +373,7 @@ export default function PathOSApp() {
   const W = 900;
   const milestones = data?.milestones || [];
   const totalNodes = milestones.length + 2;
-  const { nodes, height } = layoutNodes(totalNodes, W);
+  const { nodes, height } = useMemo(() => layoutNodes(totalNodes, W), [totalNodes, W]);
 
   /* resume parse */
   const parseResume = async (file) => {
@@ -434,15 +435,117 @@ export default function PathOSApp() {
   const rand = mulberry(Math.round(height)); const scenery = [];
   for (let i = 0; i < Math.floor(height / 90); i++) { const side = rand() > .5 ? 1 : -1; scenery.push({ x: W / 2 + side * (W * .32 + rand() * W * .14), y: 80 + rand() * (height - 120), s: .7 + rand() * .7 }); }
   const sel = selected != null ? milestones[selected] : null;
-  const branches = data?.branches || [];
+  const branches = data?.branches || EMPTY_BRANCHES;
   const selB = selBranch != null ? branches[selBranch] : null;
-  const branchPos = (b) => {
+  const branchPos = useCallback((b) => {
     const anchor = nodes[(b.from_milestone ?? 0) + 1] || nodes[1] || nodes[0] || { x: W / 2, y: 120 };
     const goRight = anchor.x >= W / 2;
     const bx = goRight ? Math.min(W - 110, anchor.x + 205) : Math.max(110, anchor.x - 205);
     const by = Math.min(height - 110, anchor.y + 36);
     return { anchor, bx, by };
-  };
+  }, [nodes, height, W]);
+
+  const mapWrapRef = useRef(null);
+  const joyHoldRef = useRef(null);
+  const [mapPan, setMapPan] = useState({ x: 0, y: 0, scale: 1 });
+  const [manualExplore, setManualExplore] = useState(false);
+  const [panInstant, setPanInstant] = useState(false);
+  const focusPoint = useMemo(() => {
+    if (selected != null) {
+      const node = nodes[selected + 1];
+      if (!node) return null;
+      const type = milestones[selected]?.scene_type || "office";
+      const rise = LANDMARKS[type]?.rise || 130;
+      return { x: node.x, y: node.y - rise * 0.55 };
+    }
+    if (selBranch != null) {
+      const b = branches[selBranch];
+      if (!b) return null;
+      const { bx, by } = branchPos(b);
+      const type = b.scene_type || "office";
+      const rise = LANDMARKS[type]?.rise || 130;
+      return { x: bx, y: by - rise * 0.55 };
+    }
+    return null;
+  }, [selected, selBranch, nodes, milestones, branches, branchPos]);
+  const clampPan = useCallback((x, y, scale, wrap) => {
+    const wrapW = wrap.clientWidth;
+    const wrapH = wrap.clientHeight;
+    const baseScale = wrapW / W;
+    const renderW = wrapW * scale;
+    const renderH = height * baseScale * scale;
+    return {
+      x: Math.max(wrapW - renderW, Math.min(0, x)),
+      y: Math.max(wrapH - renderH, Math.min(0, y)),
+      scale,
+    };
+  }, [height, W]);
+  const computeFocusPan = useCallback((point, wrap) => {
+    const wrapW = wrap.clientWidth;
+    const wrapH = wrap.clientHeight;
+    const baseScale = wrapW / W;
+    const zoom = 1.38;
+    const sheetSpace = wrapH * 0.42;
+    const viewH = wrapH - sheetSpace;
+    let panX = wrapW / 2 - point.x * baseScale * zoom;
+    let panY = viewH * 0.48 - point.y * baseScale * zoom;
+    return clampPan(panX, panY, zoom, wrap);
+  }, [clampPan, W]);
+  const applyAutoPan = useCallback(() => {
+    const wrap = mapWrapRef.current;
+    if (!wrap || view !== "journey") return;
+    if (!wrap.clientWidth || !wrap.clientHeight) return;
+    setPanInstant(false);
+    setMapPan(prev => {
+      let next;
+      if (manualExplore) next = clampPan(prev.x, prev.y, prev.scale, wrap);
+      else if (focusPoint) next = computeFocusPan(focusPoint, wrap);
+      else next = { x: 0, y: 0, scale: 1 };
+      if (prev.x === next.x && prev.y === next.y && prev.scale === next.scale) return prev;
+      return next;
+    });
+  }, [manualExplore, focusPoint, view, clampPan, computeFocusPan]);
+  useLayoutEffect(() => { applyAutoPan(); }, [applyAutoPan]);
+  useEffect(() => {
+    const wrap = mapWrapRef.current;
+    if (!wrap) return;
+    const ro = new ResizeObserver(() => applyAutoPan());
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [applyAutoPan]);
+  const stopJoyHold = useCallback(() => {
+    if (!joyHoldRef.current) return;
+    clearTimeout(joyHoldRef.current.delay);
+    clearInterval(joyHoldRef.current.interval);
+    joyHoldRef.current = null;
+  }, []);
+  const nudgeMapVertical = useCallback((dir) => {
+    const wrap = mapWrapRef.current;
+    if (!wrap) return;
+    setManualExplore(true);
+    setPanInstant(true);
+    const step = Math.max(72, wrap.clientHeight * 0.14);
+    const dy = dir === "up" ? step : -step;
+    setMapPan(prev => clampPan(prev.x, prev.y + dy, prev.scale || 1, wrap));
+  }, [clampPan]);
+  const startJoyHold = useCallback((dir) => {
+    stopJoyHold();
+    nudgeMapVertical(dir);
+    const delay = setTimeout(() => {
+      const interval = setInterval(() => nudgeMapVertical(dir), 130);
+      joyHoldRef.current = { delay, interval };
+    }, 320);
+    joyHoldRef.current = { delay, interval: null };
+  }, [nudgeMapVertical, stopJoyHold]);
+  useEffect(() => () => stopJoyHold(), [stopJoyHold]);
+  useEffect(() => {
+    if (view !== "journey") {
+      setManualExplore(false);
+      setMapPan({ x: 0, y: 0, scale: 1 });
+    }
+  }, [view]);
+  const selectMilestone = (i) => { setManualExplore(false); setSelected(i); setSelBranch(null); };
+  const selectBranch = (bi) => { setManualExplore(false); setSelBranch(bi); setSelected(null); };
 
   /* editable pathway ops */
   const updateMilestone = (i, field, val) => setData(d => { const ms = d.milestones.map((m, k) => k === i ? { ...m, [field]: val } : m); return { ...d, milestones: ms }; });
@@ -665,7 +768,8 @@ export default function PathOSApp() {
         <div className="px-state"><div style={{fontSize:44,opacity:.4}}>🗺️</div><h3>No journey yet</h3><p>Run a gap analysis first and PathOS will plot your illustrated milestone walk.</p><button className="px-go" style={{maxWidth:240}} onClick={() => setView("analysis")}>Go to analysis →</button></div>
       ) : (
         <div className="px-stage">
-          <div className="px-mapwrap">
+          <div className="px-mapwrap" ref={mapWrapRef}>
+            <div className={`px-mappan${panInstant ? " instant" : ""}`} style={{ transform: `translate(${mapPan.x}px, ${mapPan.y}px) scale(${mapPan.scale})` }}>
             <svg className="px-map" viewBox={`0 0 ${W} ${height}`} xmlns="http://www.w3.org/2000/svg">
               <defs><filter id="wob"><feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={PAL.bgTop}/><stop offset="1" stopColor={PAL.bg}/></linearGradient></defs>
               <rect x="0" y="0" width={W} height={height} fill="url(#sky)"/>
@@ -674,7 +778,7 @@ export default function PathOSApp() {
               <g filter="url(#wob)">{nodes.slice(0,-1).map((n,i) => { const lit = reached(i) && reached(i+1); return <path key={i} d={segPath(n,nodes[i+1],i%2===0)} fill="none" stroke={lit?PAL.terra:PAL.terraDark} strokeOpacity={lit?1:.4} strokeWidth="6" strokeLinecap="round" strokeDasharray={lit?"0":"2 12"}/>; })}</g>
               {nodes.map((n,i) => { const isStart = i===0, isDest = i===totalNodes-1, mi = i-1; const type = isStart?"cottage":isDest?"summit":(milestones[mi]?.scene_type||"office"); const r = reached(i), markerY = n.y-(LANDMARKS[type]?.rise||130), clickable = !isStart && !isDest; return (
                 <g key={i}><g transform={`translate(${n.x},${n.y})`} filter="url(#wob)"><Landmark type={type}/></g>
-                  <g transform={`translate(${n.x},${markerY})`} style={{cursor:clickable?"pointer":"default"}} onClick={() => { if (clickable) { setSelected(mi); setSelBranch(null); } }}><line x1="0" y1="6" x2="0" y2="20" stroke={PAL.ink} strokeWidth="2"/><circle cx="0" cy="0" r="16" fill={r?PAL.tealDark:PAL.terra} stroke={PAL.ink} strokeWidth="2.5"/><text x="0" y="5" textAnchor="middle" fontFamily="Fredoka" fontWeight="700" fontSize="15" fill="#fff">{isStart?"S":isDest?"★":(r?"✓":mi+1)}</text></g>
+                  <g transform={`translate(${n.x},${markerY})`} style={{cursor:clickable?"pointer":"default"}} onClick={() => { if (clickable) selectMilestone(mi); }}><line x1="0" y1="6" x2="0" y2="20" stroke={PAL.ink} strokeWidth="2"/><circle cx="0" cy="0" r="16" fill={r?PAL.tealDark:PAL.terra} stroke={PAL.ink} strokeWidth="2.5"/><text x="0" y="5" textAnchor="middle" fontFamily="Fredoka" fontWeight="700" fontSize="15" fill="#fff">{isStart?"S":isDest?"★":(r?"✓":mi+1)}</text></g>
                   <text x={n.x} y={markerY-24} textAnchor="middle" fontFamily="Fredoka" fontWeight="600" fontSize={isDest?17:13} fill={isDest?PAL.terra:PAL.ink}>{isStart?(data.start_label||currentRole):isDest?(data.destination_label||targetRole):milestones[mi]?.name}</text></g>); })}
               {branches.map((b, bi) => {
                 const { anchor, bx, by } = branchPos(b);
@@ -684,7 +788,7 @@ export default function PathOSApp() {
                   <g key={"br" + bi}>
                     <path d={segPath(anchor, { x: bx, y: by }, anchor.x < bx)} fill="none" stroke={PAL.blue} strokeOpacity="0.7" strokeWidth="4" strokeDasharray="6 8" strokeLinecap="round" filter="url(#wob)" />
                     <g transform={`translate(${bx},${by})`} filter="url(#wob)" opacity="0.92"><Landmark type={type} /></g>
-                    <g transform={`translate(${bx},${markerY})`} style={{ cursor: "pointer" }} onClick={() => { setSelBranch(bi); setSelected(null); }}>
+                    <g transform={`translate(${bx},${markerY})`} style={{ cursor: "pointer" }} onClick={() => selectBranch(bi)}>
                       <line x1="0" y1="6" x2="0" y2="20" stroke={PAL.ink} strokeWidth="2" />
                       <rect x="-13" y="-13" width="26" height="26" rx="4" transform="rotate(45)" fill={PAL.blue} stroke={PAL.ink} strokeWidth="2.5" />
                       <text x="0" y="5" textAnchor="middle" fontFamily="Fredoka" fontWeight="700" fontSize="13" fill="#fff">✦</text>
@@ -695,15 +799,21 @@ export default function PathOSApp() {
                 );
               })}
             </svg>
+            </div>
             {sel && (<div className="px-sheet"><button className="px-sheet-x" onClick={() => setSelected(null)}>×</button><span className="px-sheet-tag">Stop {selected+1} · {sel.timeline}</span><div className="px-sheet-nm">{sel.name}</div><div className="px-sheet-ac">{sel.action}</div><p className="px-sheet-dt">{sel.detail}</p><div className="px-chips">{sel.skill_unlocked && <div className="px-chip"><b>Skill unlocked</b>{sel.skill_unlocked}</div>}{sel.gap_closed && <div className="px-chip"><b>Closes gap</b>{sel.gap_closed}</div>}{sel.cert && <div className="px-chip"><b>Certification</b>{sel.cert}</div>}</div><button className={`px-reach ${done.has(selected)?"done":"todo"}`} onClick={() => toggleDone(selected)}>{done.has(selected)?"✓ Reached · +150 XP · badge earned":"Mark this milestone reached"}</button></div>)}
             {selB && (<div className="px-sheet"><button className="px-sheet-x" onClick={() => setSelBranch(null)}>×</button><span className="px-sheet-tag" style={{background:PAL.blue}}>Alternative path · transferable</span><div className="px-sheet-nm">{selB.label}</div><div className="px-sheet-ac" style={{color:PAL.blue}}>→ {selB.alt_role}</div><p className="px-sheet-dt">{selB.rationale}</p><div className="px-chips">{(selB.transferable_skills||[]).length>0 && <div className="px-chip"><b>Transfers from your path</b>{(selB.transferable_skills||[]).join(", ")}</div>}{(selB.extra_steps||[]).length>0 && <div className="px-chip"><b>Extra step to pivot</b>{(selB.extra_steps||[]).join("; ")}</div>}</div><button className="px-reach todo" style={{background:PAL.blue}} onClick={() => { setTargetRole(selB.alt_role); setSelBranch(null); generate(); }}>Pursue this path → re-map journey</button></div>)}
+            <div className={`px-joy${sel || selB ? " lifted" : ""}`} aria-label="Pathway navigation">
+              <span className="px-joy-label">Explore</span>
+              <button type="button" className="px-joy-btn" aria-label="Pan up the path" onPointerDown={(e) => { e.preventDefault(); startJoyHold("up"); }} onPointerUp={stopJoyHold} onPointerLeave={stopJoyHold} onPointerCancel={stopJoyHold}>▲</button>
+              <button type="button" className="px-joy-btn" aria-label="Pan down the path" onPointerDown={(e) => { e.preventDefault(); startJoyHold("down"); }} onPointerUp={stopJoyHold} onPointerLeave={stopJoyHold} onPointerCancel={stopJoyHold}>▼</button>
+            </div>
           </div>
           <div className="px-rail">
             <span className="px-rail-link" onClick={() => setView("analysis")}>← Back to analysis</span>
             {allDone && <div className="px-banner">🎉 Journey complete — {liveReadiness}% ready for {data.destination_label || targetRole}!</div>}
             {done.size > 0 && <div className="px-rail-link" style={{color:PAL.gold}} onClick={() => setView("profile")}>✦ {done.size} badge{done.size>1?"s":""} earned — view on profile →</div>}
             <div><div className="px-prog-l"><span>Journey progress</span><span>{done.size}/{milestones.length}</span></div><div className="px-track"><div className="px-fill" style={{width:pct+"%"}}/></div><div className="px-xp">✦ {xp} XP earned</div></div>
-            <div><div className="px-key">KEY</div><ul className="px-keylist"><li className="px-keyitem done"><span className="px-keynum">S</span><span>{data.start_label||currentRole} — start</span></li>{milestones.map((m,i) => <li key={i} className={`px-keyitem ${done.has(i)?"done":""}`} onClick={() => { setSelected(i); setSelBranch(null); }}><span className="px-keynum">{done.has(i)?"✓":i+1}</span><span>{m.name}</span></li>)}<li className={`px-keyitem ${allDone?"done":""}`}><span className="px-keynum" style={{background:PAL.gold}}>★</span><span>{data.destination_label||targetRole} — goal</span></li></ul>{branches.length>0 && <div className="px-mini" style={{marginTop:8,color:PAL.blue}}>✦ Dashed blue markers are alternative paths your transferable skills unlock — tap one to explore or pursue it.</div>}</div>
+            <div><div className="px-key">KEY</div><ul className="px-keylist"><li className="px-keyitem done"><span className="px-keynum">S</span><span>{data.start_label||currentRole} — start</span></li>{milestones.map((m,i) => <li key={i} className={`px-keyitem ${done.has(i)?"done":""} ${selected===i?"active":""}`} onClick={() => selectMilestone(i)}><span className="px-keynum">{done.has(i)?"✓":i+1}</span><span>{m.name}</span></li>)}<li className={`px-keyitem ${allDone?"done":""}`}><span className="px-keynum" style={{background:PAL.gold}}>★</span><span>{data.destination_label||targetRole} — goal</span></li></ul>{branches.length>0 && <div className="px-mini" style={{marginTop:8,color:PAL.blue}}>✦ Dashed blue markers are alternative paths your transferable skills unlock — tap one to explore or pursue it.</div>}</div>
           </div>
         </div>
       ))}
