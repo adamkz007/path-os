@@ -56,7 +56,7 @@ const normalizeWorkspace = (workspace = {}) => ({
   apps: Array.isArray(workspace.apps) ? workspace.apps : APPS_SEED,
   appView: workspace.appView === "one" ? "one" : "all",
   appSel: typeof workspace.appSel === "string" ? workspace.appSel : null,
-  view: typeof workspace.view === "string" ? workspace.view : "profile",
+  view: typeof workspace.view === "string" ? workspace.view : "home",
   cView: typeof workspace.cView === "string" ? workspace.cView : "dashboard",
   uView: typeof workspace.uView === "string" ? workspace.uView : "graduates",
   postedJobs: Array.isArray(workspace.postedJobs) ? workspace.postedJobs : JOBS_SEED,
@@ -133,7 +133,7 @@ const createDemoWorkspace = (demoRole) => {
     skills: ["Brand strategy", "Client management", "Campaign planning", "Pitching"],
     targetRole: "Creative Strategy Lead",
     targetIndustry: "Creative agency",
-    view: "applications",
+    view: "home",
     apps: APPS_SEED,
     postedJobs: JOBS_SEED,
     applicants: APPLICANTS_SEED,
@@ -181,12 +181,13 @@ export default function PathOSApp() {
   const [appView, setAppView] = useState("all"); // all | one
   const [appSel, setAppSel] = useState(null);
   // shell views
-  const [view, setView] = useState("profile");          // seeker
+  const [view, setView] = useState("home");          // seeker
   const [cView, setCView] = useState("dashboard");        // company
   const [uView, setUView] = useState("graduates");        // university
   const [postedJobs, setPostedJobs] = useState(JOBS_SEED);
   const [hhFilter, setHhFilter] = useState("");
   const [applicants, setApplicants] = useState(APPLICANTS_SEED);
+  const [homeJobsTab, setHomeJobsTab] = useState("jobs");
 
   const streamEnd = useRef(null);
   useEffect(() => { streamEnd.current?.scrollTo(0, 9e9); }, [stream]);
@@ -671,12 +672,147 @@ export default function PathOSApp() {
       <div className="px-nav">
         <div className="px-nav-title">{data?.journey_title || (profile ? profile.name : "Workspace")}</div>
         <NavTabs
-          tabs={[["profile","📇 Profile"],["assessments","🧠 Assessments"],["analysis","📋 Analysis"],["journey","🗺️ Journey"],["jobs","💼 Jobs"],["applications","📨 Applications"]]}
+          tabs={[["home","🏠 Home"],["profile","📇 Profile"],["assessments","🧠 Assessments"],["analysis","📋 Analysis"],["journey","🗺️ Journey"],["jobs","💼 Jobs"],["applications","📨 Applications"]]}
           active={view}
           onChange={setView}
         />
         {data && <div className="px-readpill" title="Rises as you complete milestones">Ready <b style={{color:readColor(liveReadiness)}}>{liveReadiness}%</b><span className="dotbar"><i style={{width:liveReadiness+"%",background:readColor(liveReadiness)}}/></span></div>}
       </div>
+
+      {/* HOME */}
+      {view === "home" && (() => {
+        const journeyDone = !!data && milestones.length > 0 && done.size === milestones.length;
+        const steps = [
+          {
+            id: "profile", view: "profile", icon: "📇", title: "Build your profile",
+            desc: "Upload or paste your resume so PathOS can build your living CV.",
+            doneDesc: `${profile?.name || "Your"} profile is set up — ${skillsList.length} skills, ${achievementBadges.length} badge${achievementBadges.length===1?"":"s"}.`,
+            done: !!profile,
+          },
+          {
+            id: "analysis", view: "analysis", icon: "📋", title: "Run your gap analysis",
+            desc: "Tell PathOS your current role and target role to get a readiness score and mapped path.",
+            doneDesc: `Readiness ${liveReadiness}% toward ${data?.destination_label || targetRole}. ${data?.gaps?.length || 0} gap${(data?.gaps?.length||0)===1?"":"s"} identified.`,
+            done: !!data,
+          },
+          {
+            id: "journey", view: "journey", icon: "🗺️", title: "Walk your journey",
+            desc: "Your illustrated path unlocks once you run a gap analysis.",
+            doneDesc: journeyDone ? `All ${milestones.length} milestones reached · ${xp} XP earned. 🎉` : `${done.size}/${milestones.length} milestones reached · ${xp} XP earned.`,
+            done: journeyDone,
+            disabled: !data,
+          },
+        ];
+        const nextStep = steps.find(s => !s.done && !s.disabled) || steps.find(s => !s.done);
+        const completedCount = steps.filter(s => s.done).length;
+        return (
+        <div className="px-wrap">
+          <div className="px-home-hero">
+            <div>
+              <h1>Welcome back{profile?.name ? `, ${profile.name.split(" ")[0]}` : ""} 👋</h1>
+              <p>{completedCount === steps.length ? "You've completed every step — keep exploring jobs and your journey." : `${completedCount}/${steps.length} steps done. Here's what we recommend next.`}</p>
+            </div>
+            {nextStep && (
+              <button type="button" className="px-home-hero-cta" onClick={() => setView(nextStep.view)}>
+                <span className="ic">{nextStep.icon}</span>
+                <span>{nextStep.title} →</span>
+              </button>
+            )}
+          </div>
+
+          <div className="px-home-layout">
+            <div className="px-home-col">
+              <div className="px-home-panel px-home-eq-h">
+                <div className="px-home-panel-h"><span>🧭</span><span>Discover your path</span><span className="ct">{completedCount}/{steps.length}</span></div>
+                <div className="px-home-steps-grid">
+                  {steps.map((s,i) => (
+                    <button type="button" key={s.id} className={`px-home-step-card c${i+1} ${s.done ? "done" : ""}`} onClick={() => setView(s.view)}>
+                      <div className="top"><span className="step-num">{s.done ? "✓ Done" : `Step ${i+1}`}</span><span className="ic">{s.icon}</span></div>
+                      <h4>{s.title}</h4>
+                      <p>{s.done ? s.doneDesc : (s.disabled ? "Run your gap analysis first to unlock this." : s.desc)}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-home-col px-home-col-side">
+              {data && (
+                <div className="px-home-panel">
+                  <div className="px-home-panel-h"><span>📊</span><span>Readiness</span></div>
+                  <div className="px-home-readiness">
+                    <Donut pct={liveReadiness} color={readColor(liveReadiness)} />
+                    <div>
+                      <p style={{fontSize:13,lineHeight:1.6}}>{data.readiness_summary}</p>
+                      <button type="button" className="px-pill-btn" style={{marginTop:8}} onClick={() => setView("journey")}>View journey →</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="px-home-panel px-home-eq-h px-home-top">
+                <div className="px-home-panel-h"><span>🧠</span><span>Assessments</span><span className="ct">{assessCount}/{ASSESS_DEFS.length}</span></div>
+                <p className="px-mini">These 7 frameworks cover your personality, behavioural style, motivations, and strengths. Completing them helps PathOS tailor your pathway and gives employers a fuller picture of you — beyond just skills on a CV.</p>
+                {(() => {
+                  const next = ASSESS_DEFS.find(d => { const v = assess[d.key]; return !(v && (!Array.isArray(v) || v.length)); });
+                  if (next) {
+                    return (
+                      <button type="button" className="px-home-asm-next" onClick={() => setView("assessments")}>
+                        <div className="ic">{next.icon}</div>
+                        <div className="txt">
+                          <div className="nm">Next up: {next.name}</div>
+                          <div className="sb">{next.sub}</div>
+                        </div>
+                        <div className="cta">Take assessment →</div>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button type="button" className="px-home-asm-next done" onClick={() => setView("assessments")}>
+                      <div className="ic">🎉</div>
+                      <div className="txt">
+                        <div className="nm">All 7 assessments complete!</div>
+                        <div className="sb">View your holistic profile and results.</div>
+                      </div>
+                      <div className="cta">View results →</div>
+                    </button>
+                  );
+                })()}
+                {assessCount >= 2 && !assessOut && <p className="px-mini px-home-bottom">You've completed enough assessments to synthesize a holistic profile — head to Assessments to do so.</p>}
+                {assessOut && <p className="px-mini px-home-bottom">✦ Holistic snapshot ready — view it on the Assessments page.</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="px-home-panel">
+            <div className="px-home-panel-h">
+              <span>💼</span><span>Jobs</span>
+              <div className="px-tabs" style={{marginLeft:"auto"}}>
+                <button type="button" className={`px-tab ${homeJobsTab==="jobs"?"on":""}`} onClick={() => setHomeJobsTab("jobs")}>Recommended</button>
+                {apps.length > 0 && <button type="button" className={`px-tab ${homeJobsTab==="applications"?"on":""}`} onClick={() => setHomeJobsTab("applications")}>Applications</button>}
+              </div>
+            </div>
+            {homeJobsTab === "jobs" ? (<>
+              <p className="px-mini">{data ? `Matched against your target "${data.destination_label || targetRole}" and the skills your journey unlocks.` : "Run a gap analysis for personalised match scores — showing top open roles for now."}</p>
+              <div className="px-home-jobs-grid">
+                {[...postedJobs].sort((a,b) => jobMatch(b)-jobMatch(a)).slice(0,2).map(job => { const m = jobMatch(job); const applied = apps.some(a => a.title === job.title && a.company === job.company); return (
+                  <div key={job.id} className="px-job"><div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
+                    <div><div className="px-job-t">{job.title}</div><div className="px-job-c">{job.company} · {job.location} · {job.level} · {job.salary}</div><div className="px-skchips" style={{marginTop:8}}>{job.skills.map((s,i) => <span key={i} className="px-skchip">{s}</span>)}</div></div>
+                    <div style={{textAlign:"center",flexShrink:0}}><div className="px-match" style={{color:readColor(m)}}>{m}%</div><div className="px-mini">match</div></div>
+                  </div><button className={`px-pill-btn ${applied?"":"primary"}`} style={{marginTop:10}} disabled={applied} onClick={() => applyToJob(job)}>{applied ? "✓ Applied" : "Apply via PathOS →"}</button></div>
+                ); })}
+              </div>
+              <button type="button" className="px-pill-btn" style={{alignSelf:"flex-end"}} onClick={() => setView("jobs")}>See more jobs →</button>
+            </>) : (<>
+              {apps.slice(0,3).map(a => (
+                <div key={a.id} className="px-row"><div className="av">{a.company[0]}</div><div className="main"><div className="t">{a.title}</div><div className="s">{a.company} · applied {a.date}</div></div><St s={a.status}/></div>
+              ))}
+              <button type="button" className="px-pill-btn" style={{alignSelf:"flex-end"}} onClick={() => setView("applications")}>See all applications →</button>
+            </>)}
+          </div>
+        </div>
+        );
+      })()}
 
       {/* PROFILE */}
       {view === "profile" && (
