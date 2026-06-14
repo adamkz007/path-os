@@ -172,6 +172,8 @@ export const PATHOS_CSS = `
 .px-up p{font-size:13px;color:${PAL.inkSoft};max-width:380px;margin:0 auto 1rem;line-height:1.6;}
 .px-up-btn{display:inline-block;padding:11px 22px;background:${PAL.terra};color:#fff;border:none;border-radius:10px;font-family:'Fredoka';font-weight:600;font-size:14px;cursor:pointer;}
 .px-or{font-size:12px;color:${PAL.inkSoft};margin:1rem 0 .5rem;}
+.px-cv-chip{display:inline-flex;align-items:center;gap:8px;background:${PAL.cream};border:1.5px solid ${PAL.creamLow};border-radius:10px;padding:10px 16px;font-family:'Fredoka';font-weight:600;font-size:13.5px;color:${PAL.ink};}
+.px-cv-chip .ic{font-size:16px;}
 .px-badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
 .px-badge{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1.5px solid ${PAL.creamLow};border-radius:10px;padding:11px;}
 .px-badge.locked{opacity:.62;border-style:dashed;background:${PAL.paperDark};}
@@ -214,6 +216,15 @@ export const PATHOS_CSS = `
 .px-asm select{width:100%;padding:7px 9px;border:1.5px solid ${PAL.creamLow};border-radius:7px;font:inherit;font-size:12px;background:#fff;}
 .px-asm .res{margin-top:8px;font-size:12px;font-weight:600;color:${PAL.tealDark};}
 .px-mini{font-size:11px;color:${PAL.inkSoft};line-height:1.5;}
+.px-asm-result{display:inline-block;margin-top:4px;font-family:'Fredoka';font-weight:700;font-size:20px;color:${PAL.tealDark};}
+.px-asm-cta{width:100%;padding:9px;background:${PAL.teal};color:#fff;border:none;border-radius:8px;font-family:'Fredoka';font-weight:600;font-size:12.5px;cursor:pointer;}
+.px-asm-cta:hover{background:${PAL.tealDark};}
+.px-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.px-modal{background:#fff;border-radius:14px;padding:24px;max-width:360px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.2);}
+.px-modal .ic{font-size:28px;margin-bottom:8px;}
+.px-modal p{font-size:13.5px;color:${PAL.inkSoft};line-height:1.6;margin:10px 0 18px;}
+.px-modal button{padding:9px 20px;background:${PAL.terra};color:#fff;border:none;border-radius:8px;font-family:'Fredoka';font-weight:600;font-size:13px;cursor:pointer;}
+.px-modal button:hover{background:${PAL.terraDark};}
 .px-editrow{display:flex;gap:6px;align-items:center;}
 .px-editrow input{flex:1;padding:7px 9px;border:1.5px solid ${PAL.creamLow};border-radius:7px;font:inherit;font-size:12px;}
 .px-xbtn{border:none;background:${PAL.gapBg};color:${PAL.gap};width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;}

@@ -5,6 +5,9 @@ import {
   APPS_SEED,
   ASSESS_DEFS,
   CANDIDATE_POOL,
+  DEMO_ANALYSIS,
+  DEMO_ASSESS_OUT,
+  DEMO_PROFILE,
   GRADUATES,
   JOBS_SEED,
   PAL,
@@ -13,13 +16,7 @@ import {
   STATUS_COLOR,
 } from "./constants";
 import {
-  ASSESS_SYS,
-  DEEPSEEK_UNSUPPORTED_UPLOAD,
-  PROFILE_SYS,
-  SYS,
   buildProfileHTML,
-  createDeepSeekMessage,
-  parseJSON,
 } from "./ai";
 import { Bars, Donut, St } from "./charts.jsx";
 import { LANDMARKS, Landmark, Tree, layoutNodes, mulberry, segPath, slug } from "./journey.jsx";
@@ -51,7 +48,7 @@ const normalizeWorkspace = (workspace = {}) => ({
   done: Array.isArray(workspace.done) ? workspace.done : [],
   profile: workspace.profile || null,
   openToWork: typeof workspace.openToWork === "boolean" ? workspace.openToWork : true,
-  assess: workspace.assess && typeof workspace.assess === "object" ? workspace.assess : {},
+  assess: workspace.assess && typeof workspace.assess === "object" ? { mbti: "INFJ", energy: "Night Owl", ...workspace.assess } : { mbti: "INFJ", energy: "Night Owl" },
   assessOut: workspace.assessOut || null,
   apps: Array.isArray(workspace.apps) ? workspace.apps : APPS_SEED,
   appView: workspace.appView === "one" ? "one" : "all",
@@ -171,9 +168,9 @@ export default function PathOSApp() {
   const [pasteText, setPasteText] = useState("");
   const [shareMsg, setShareMsg] = useState("");
   const [openToWork, setOpenToWork] = useState(true);
-  const fileRef = useRef(null);
   // seeker — assessments
-  const [assess, setAssess] = useState({});
+  const [assess, setAssess] = useState({ mbti: "INFJ", energy: "Night Owl" });
+  const [assessModal, setAssessModal] = useState(false);
   const [assessOut, setAssessOut] = useState(null);
   const [assessLoading, setAssessLoading] = useState(false);
   // seeker — jobs + applications
@@ -423,50 +420,26 @@ export default function PathOSApp() {
   const { nodes, height } = useMemo(() => layoutNodes(totalNodes, W), [totalNodes, W]);
 
   /* resume parse */
-  const parseResume = async (file) => {
+  const parseResume = async () => {
     setParseStatus("parsing"); setParseError("");
-    try {
-      let content;
-      if (file) {
-        if (file.type === "application/pdf" || file.type.startsWith("image/")) {
-          throw new Error(DEEPSEEK_UNSUPPORTED_UPLOAD);
-        }
-        const t = await file.text();
-        content = `Extract my professional profile from this resume:\n\n${t}`;
-      } else {
-        content = `Extract my professional profile from this resume:\n\n${pasteText}`;
-      }
-      const res = await createDeepSeekMessage({ max_tokens: 3000, system: PROFILE_SYS, messages: [{ role: "user", content }] });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error?.message || "Parse error");
-      const txt = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
-      const p = parseJSON(txt);
-      if (!p) throw new Error("Couldn't read that file. Try pasting your resume text instead.");
-      setProfile(p);
-      if (p.headline) setCurrentRole(p.headline);
-      if (p.skills?.length) setSkills(p.skills.slice(0, 12));
-      if (p.experience?.length) setExperience(p.experience.map(e => `${e.role} at ${e.company}${e.period ? ` (${e.period})` : ""}`).join("; "));
-      if (p.education?.length) setEducation(`${p.education[0].degree}, ${p.education[0].institution}${p.education[0].year ? ", " + p.education[0].year : ""}`);
-      setParseStatus("idle");
-    } catch (e) { setParseError(e.message); setParseStatus("error"); }
+    // Demo prototype: use hardcoded placeholder data instead of calling the live API.
+    await new Promise(r => setTimeout(r, 900));
+    const p = DEMO_PROFILE;
+    setProfile(p);
+    if (p.headline) setCurrentRole(p.headline);
+    if (p.skills?.length) setSkills(p.skills.slice(0, 12));
+    if (p.experience?.length) setExperience(p.experience.map(e => `${e.role} at ${e.company}${e.period ? ` (${e.period})` : ""}`).join("; "));
+    if (p.education?.length) setEducation(`${p.education[0].degree}, ${p.education[0].institution}${p.education[0].year ? ", " + p.education[0].year : ""}`);
+    setParseStatus("idle");
   };
-  const onFile = (e) => { const f = e.target.files?.[0]; if (f) parseResume(f); };
 
   /* analysis */
   const generate = async () => {
     if (!currentRole.trim() || !targetRole.trim()) return;
     setStatus("loading"); setStream(""); setData(null); setError(""); setSelected(null); setSelBranch(null); setDone(new Set()); setView("analysis");
-    const msg = `Current role: ${currentRole}\nExperience: ${experience || "not specified"}\nEducation: ${education || "not specified"}\nSkills: ${skills.length ? skills.join(", ") : "not specified"}\nTarget role: ${targetRole}\nTarget industry: ${targetIndustry || "not specified"}\n\nProduce the full analysis and illustrated journey.`;
-    try {
-      const res = await createDeepSeekMessage({ max_tokens: 5000, stream: true, system: SYS, messages: [{ role: "user", content: msg }] });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || "API error"); }
-      const reader = res.body.getReader(), dec = new TextDecoder(); let acc = "";
-      while (true) { const { done:d, value } = await reader.read(); if (d) break;
-        for (const line of dec.decode(value, { stream:true }).split("\n")) { if (!line.startsWith("data: ")) continue; const b = line.slice(6); if (b === "[DONE]") continue; try { const j = JSON.parse(b); if (j.type === "content_block_delta" && j.delta?.text) { acc += j.delta.text; setStream(acc); } } catch {} } }
-      const parsed = parseJSON(acc);
-      if (parsed?.milestones?.length) { setData(parsed); setStatus("done"); }
-      else { setError("Couldn't parse the result. Raw: " + acc.slice(0, 240)); setStatus("error"); }
-    } catch (e) { setError(e.message); setStatus("error"); }
+    // Demo prototype: use a hardcoded example instead of calling the live API.
+    await new Promise(r => setTimeout(r, 900));
+    setData(DEMO_ANALYSIS); setStatus("done");
   };
 
   const toggleDone = (i) => setDone(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; });
@@ -612,16 +585,11 @@ export default function PathOSApp() {
   const exportCV = () => { if (!profile) return; const html = buildProfileHTML(profile, certBadges, achievementBadges, skillsList, expList, eduList); const blob = new Blob([html], { type:"text/html" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${slug(profile.name)}-pathos-cv.html`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); };
 
   /* assessments */
-  const setAssessVal = (key, val) => setAssess(p => ({ ...p, [key]: val }));
-  const toggleMulti = (key, opt, max) => setAssess(p => { const cur = p[key] || []; if (cur.includes(opt)) return { ...p, [key]: cur.filter(x => x !== opt) }; if (cur.length >= max) return p; return { ...p, [key]: [...cur, opt] }; });
   const synthAssess = async () => {
     setAssessLoading(true); setAssessOut(null);
-    const summary = ASSESS_DEFS.map(d => { const v = assess[d.key]; if (!v || (Array.isArray(v) && !v.length)) return null; return `${d.name}: ${Array.isArray(v) ? v.join(", ") : v}`; }).filter(Boolean).join("\n");
-    try {
-      const res = await createDeepSeekMessage({ max_tokens: 1200, system: ASSESS_SYS, messages: [{ role: "user", content: `My assessment results:\n${summary}\n\nMy target role: ${targetRole}. Synthesize my holistic profile.` }] });
-      const j = await res.json(); const txt = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
-      setAssessOut(parseJSON(txt) || { summary: txt });
-    } catch (e) { setAssessOut({ summary:"Couldn't synthesize: " + e.message }); }
+    // Demo prototype: use a hardcoded example instead of calling the live API.
+    await new Promise(r => setTimeout(r, 900));
+    setAssessOut(DEMO_ASSESS_OUT);
     setAssessLoading(false);
   };
   const assessCount = ASSESS_DEFS.filter(d => { const v = assess[d.key]; return v && (!Array.isArray(v) || v.length); }).length;
@@ -818,14 +786,13 @@ export default function PathOSApp() {
       {view === "profile" && (
         <div className="px-wrap">
           {!profile && parseStatus !== "parsing" && (<>
-            <div className="px-intro"><h1>Your profile is your CV</h1><p className="sub">Upload a text resume or paste your resume text and PathOS builds a living profile automatically — certificates become skill badges, achievements become success-story badges. Share it as a link for any job application.</p></div>
-            <div className="px-up"><div className="ic">📄</div><h3>Upload your resume / CV</h3><p>Text file or pasted text. PathOS reads it and captures everything into your profile.</p>
-              <input ref={fileRef} type="file" accept=".txt,.md" style={{display:"none"}} onChange={onFile} />
-              <button className="px-up-btn" onClick={() => fileRef.current?.click()}>Choose text file to upload</button>
-              {parseStatus === "error" && <p style={{color:PAL.terra,marginTop:12}}>{parseError}</p>}
-              <div className="px-or">— or paste your resume text —</div>
-              <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} placeholder="Paste resume text here…" style={{width:"100%",minHeight:100,padding:11,border:`1.5px solid ${PAL.creamLow}`,borderRadius:8,fontFamily:"inherit",fontSize:13,lineHeight:1.5}} />
-              <button className="px-go" style={{maxWidth:240,margin:"10px auto 0"}} disabled={!pasteText.trim()} onClick={() => parseResume(null)}>Build my profile ✦</button>
+            <div className="px-intro"><h1>Your profile is your CV</h1><p className="sub">PathOS reads your resume and builds a living profile automatically — certificates become skill badges, achievements become success-story badges. Share it as a link for any job application.</p></div>
+            <div className="px-up"><div className="ic">📄</div><h3>Your resume / CV</h3><p>We've found a resume attached to your account. PathOS will read it and build your profile.</p>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                <div className="px-cv-chip">📎 Aisyah_Rahman_CV.txt</div>
+                {parseStatus === "error" && <p style={{color:PAL.terra,marginTop:12}}>{parseError}</p>}
+                <button className="px-go" style={{maxWidth:240,marginTop:14}} onClick={parseResume}>Build my profile ✦</button>
+              </div>
             </div>
           </>)}
           {parseStatus === "parsing" && <div className="px-state"><div className="px-spin"/><h3>Reading your resume…</h3><p>PathOS is extracting your experience, skills, certificates, and achievements.</p></div>}
@@ -864,14 +831,11 @@ export default function PathOSApp() {
             {ASSESS_DEFS.map(d => (
               <div key={d.key} className="px-asm">
                 <div className="ic">{d.icon}</div><div className="nm">{d.name}</div><div className="sb">{d.sub}</div>
-                {d.kind === "single" ? (
-                  <select value={assess[d.key] || ""} onChange={e => setAssessVal(d.key, e.target.value)}>
-                    <option value="">Select…</option>{d.opts.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <><div className="px-skchips">{d.opts.map(o => { const on = (assess[d.key] || []).includes(o); return <span key={o} className={`px-skchip ${on?"on":"off"}`} onClick={() => toggleMulti(d.key, o, d.max)}>{o}</span>; })}</div><div className="px-mini" style={{marginTop:6}}>Pick up to {d.max}.</div></>
+                {(d.key === "mbti" || d.key === "energy") ? null : (
+                  <button className="px-asm-cta" onClick={() => setAssessModal(true)}>Start assessment</button>
                 )}
-                {assess[d.key] && (Array.isArray(assess[d.key]) ? assess[d.key].length : true) && <div className="res">✓ {Array.isArray(assess[d.key]) ? assess[d.key].join(", ") : assess[d.key]}</div>}
+                {(d.key === "mbti" || d.key === "energy") && assess[d.key] && <div className="res">Your result is<br/><span className="px-asm-result">{assess[d.key]}</span></div>}
+                {(d.key !== "mbti" && d.key !== "energy") && assess[d.key] && (Array.isArray(assess[d.key]) ? assess[d.key].length : true) && <div className="res">✓ {Array.isArray(assess[d.key]) ? assess[d.key].join(", ") : assess[d.key]}</div>}
               </div>
             ))}
           </div>
@@ -884,6 +848,16 @@ export default function PathOSApp() {
               {assessOut.fit_for_target && <p style={{marginTop:4}}><b style={{display:"inline",color:PAL.tealDark}}>Fit for {targetRole} — </b>{assessOut.fit_for_target}</p>}
             </div>
           )}
+        </div>
+      )}
+
+      {assessModal && (
+        <div className="px-modal-bg" onClick={() => setAssessModal(false)}>
+          <div className="px-modal" onClick={e => e.stopPropagation()}>
+            <div className="ic">🧪</div>
+            <p>In the real product, you'd take this assessment now and your results would feed into your holistic profile. For the purposes of this demo prototype, we're showing this placeholder instead.</p>
+            <button onClick={() => setAssessModal(false)}>Got it</button>
+          </div>
         </div>
       )}
 
