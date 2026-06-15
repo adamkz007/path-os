@@ -1,3 +1,75 @@
+/* ─── demo (hardcoded) AI outputs — used in place of live API calls for the prototype ─── */
+export const DEMO_ANALYSIS = {
+  journey_title: "From Account Lead to Creative Director",
+  start_label: "Account Lead",
+  destination_label: "Creative Director",
+  readiness_score: 58,
+  readiness_summary: "You bring strong client and team leadership experience, with a growing portfolio of brand work. The main gap is hands-on creative direction at scale and a sharper personal portfolio.",
+  transition_verdict: "Realistically 9-14 months with focused upskilling. The hardest part will be building a portfolio of original creative direction work, not just managing it.",
+  strengths: [
+    { skill: "Client management", reason: "Years of direct client-facing experience build trust quickly with stakeholders." },
+    { skill: "Team leadership", reason: "Proven ability to coordinate cross-functional creative teams under deadline pressure." },
+    { skill: "Brand strategy", reason: "Solid grounding in positioning and brand narrative work." },
+    { skill: "Project delivery", reason: "Track record of shipping campaigns on time and on budget." },
+  ],
+  gaps: [
+    { name: "Creative direction portfolio", description: "Limited first-author creative work to showcase original vision.", priority: "high" },
+    { name: "Visual design fluency", description: "Needs stronger working knowledge of design tools and visual systems.", priority: "medium" },
+    { name: "Pitch storytelling", description: "Big-pitch narrative craft is less developed than account-side skills.", priority: "medium" },
+    { name: "Team mentorship", description: "Limited experience formally mentoring junior creatives.", priority: "low" },
+  ],
+  cert_recommendations: [
+    { name: "Creative Direction Foundations", provider: "School of Motion", why: "Closes the creative direction portfolio gap with structured projects." },
+    { name: "Design Systems for Brand Teams", provider: "Coursera", why: "Builds visual design fluency for cross-team collaboration." },
+    { name: "Advanced Pitch Storytelling", provider: "AdHouse Academy", why: "Sharpens pitch storytelling for bigger accounts." },
+  ],
+  milestones: [
+    { name: "The Brief Room", scene_type: "office", action: "Lead a creative brief workshop end-to-end", detail: "Run discovery sessions and translate client goals into a creative brief. Practice framing problems the way a creative director would.", timeline: "0-2 months", skill_unlocked: "Creative briefing", gap_closed: "Pitch storytelling", cert: "" },
+    { name: "Studio of Systems", scene_type: "studio", action: "Complete a design systems course", detail: "Get hands-on with visual design tools and component-based thinking. Apply it to a real brand refresh.", timeline: "1-3 months", skill_unlocked: "Visual systems thinking", gap_closed: "Visual design fluency", cert: "Design Systems for Brand Teams, Coursera" },
+    { name: "The Mentor's Bridge", scene_type: "bridge", action: "Mentor two junior designers on a live project", detail: "Take on informal mentorship of junior creatives, reviewing their work and giving direction.", timeline: "2-4 months", skill_unlocked: "Creative mentorship", gap_closed: "Team mentorship", cert: "" },
+    { name: "Portfolio Workshop", scene_type: "workshop", action: "Build 3 original creative direction case studies", detail: "Develop a portfolio of self-directed creative concepts, from mood boards to final assets.", timeline: "3-6 months", skill_unlocked: "Creative direction craft", gap_closed: "Creative direction portfolio", cert: "Creative Direction Foundations, School of Motion" },
+    { name: "The Pitch Tower", scene_type: "tower", action: "Lead a pitch for a new business opportunity", detail: "Co-lead a pitch presentation, owning the creative narrative and visual direction.", timeline: "6-9 months", skill_unlocked: "Pitch leadership", gap_closed: "Pitch storytelling", cert: "" },
+    { name: "Creative Director's Gallery", scene_type: "gallery", action: "Step into a Creative Director role on a project", detail: "Own creative direction for a full campaign, from concept to execution, with a team reporting to you.", timeline: "9-14 months", skill_unlocked: "Creative direction", gap_closed: "Creative direction portfolio", cert: "" },
+  ],
+  branches: [
+    { from_milestone: 1, alt_role: "Brand Strategy Director", label: "The Strategist's Atrium", scene_type: "office", transferable_skills: ["Brand strategy", "Client management"], rationale: "Your strategic and client skills transfer directly into a strategy-led leadership role, trading hands-on creative craft for narrative and positioning depth.", extra_steps: ["Build 2 brand strategy case studies"] },
+    { from_milestone: 3, alt_role: "Art Director", label: "The Art Director's Loft", scene_type: "studio", transferable_skills: ["Visual systems thinking", "Creative direction craft"], rationale: "A narrower, more visual-craft-focused path that builds on the same portfolio work but emphasises art direction over overall creative leadership.", extra_steps: ["Deepen typography and layout fundamentals"] },
+  ],
+};
+
+export const DEMO_ASSESS_OUT = {
+  summary: "You combine a steady, dependable work rhythm with deep introspective thinking and a strong sense of purpose — a profile that thrives when given autonomy and meaningful work rather than constant oversight.",
+  work_style: "You work best with quiet, focused blocks of time, especially later in the day, and prefer to think things through deeply before acting.",
+  ideal_environment: "A purpose-driven team with room for independent thinking, where collaboration happens in smaller, intentional settings rather than constant open-plan noise.",
+  watchouts: "Without clear boundaries you may take on too much emotional labour for a team, and high-pressure, fast-pivoting environments can drain your energy quickly.",
+  fit_for_target: "For your target role, your combination of empathy, strategic thinking, and night-owl focus suits work that involves deep creative or analytical output with periodic, well-structured collaboration.",
+};
+
+export const DEMO_PROFILE = {
+  name: "Aisyah Rahman",
+  headline: "Senior Brand Strategist",
+  location: "Kuala Lumpur, Malaysia",
+  email: "aisyah.rahman@email.com",
+  summary: "Senior brand strategist with 7+ years building brand narratives and go-to-market campaigns for FMCG and lifestyle clients across Southeast Asia. Known for turning research into sharp creative briefs and leading cross-functional teams to deliver award-winning work.",
+  skills: ["Brand strategy", "Copywriting", "Client management", "Campaign planning", "Market research", "Presentation design", "Team leadership", "Stakeholder management"],
+  certificates: [
+    { name: "Brand Strategy Certification", provider: "General Assembly", year: "2022" },
+    { name: "Google Analytics Certified", provider: "Google", year: "2021" },
+  ],
+  achievements: [
+    { title: "Regional Campaign of the Year", story: "Led the brand strategy for a regional FMCG launch that won 'Campaign of the Year' at the local marketing awards.", metric: "+32% brand awareness" },
+    { title: "Client Retention Streak", story: "Maintained a 100% client renewal rate across 3 major accounts over 4 years through proactive strategy reviews.", metric: "3 accounts, 4 years" },
+    { title: "Mentorship Program Lead", story: "Set up and ran an internal mentorship program pairing senior strategists with junior associates.", metric: "8 mentees" },
+  ],
+  experience: [
+    { role: "Senior Brand Strategist", company: "Hatch & Co (Agency)", period: "2021 - Present", highlights: ["Lead brand strategy for 4 key accounts across FMCG and retail", "Manage a team of 3 junior strategists", "Pitch new business worth RM 2M+ in annual billings"] },
+    { role: "Brand Strategist", company: "Ember Creative", period: "2018 - 2021", highlights: ["Developed brand positioning for 10+ regional launches", "Built research-to-creative-brief workflows adopted agency-wide"] },
+  ],
+  education: [
+    { degree: "BA Communications & Marketing", institution: "Universiti Malaya", year: "2017" },
+  ],
+};
+
 export const PAL = {
   bg: "#b8c9bd", bgTop: "#c6d4c8", paper: "#f3eede", paperDark: "#e6dfc9",
   ink: "#3c4a43", inkSoft: "#5a6a61", terra: "#c0473a", terraDark: "#9a3a30",
